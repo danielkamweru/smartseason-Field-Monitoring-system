@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { usersAPI, fieldsAPI } from '../services/api';
-import { Agent, AgentStats } from '../types';
-import { 
-  UserIcon, 
-  ClipboardDocumentListIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  ClockIcon
-} from '@heroicons/react/24/outline';
+import { Agent } from '../types';
+import { UserIcon, ClipboardDocumentListIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 const Agents = () => {
   const { user } = useAuth();
@@ -17,278 +11,157 @@ const Agents = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      fetchAgentsAndStats();
-    }
+  const fetchData = React.useCallback(async () => {
+    try {
+      const [ar, sr] = await Promise.all([usersAPI.getAgents(), fieldsAPI.getDashboardStats()]);
+      setAgents(ar.data.agents);
+      const map: Record<number, number> = {};
+      sr.data.stats.agentStats?.forEach((a: any) => { map[a.id] = a.field_count; });
+      setAgentStats(map);
+    } catch { setError('Failed to fetch agent data'); }
+    finally { setLoading(false); }
   }, []);
 
-  const fetchAgentsAndStats = async () => {
-    try {
-      const [agentsResponse, statsResponse] = await Promise.all([
-        usersAPI.getAgents(),
-        fieldsAPI.getDashboardStats()
-      ]);
-      
-      setAgents(agentsResponse.data.agents);
-      
-      // Process agent statistics
-      const stats = statsResponse.data.stats;
-      const agentFieldStats: Record<number, number> = {};
-      
-      if (stats.agentStats) {
-        stats.agentStats.forEach((agent: any) => {
-          agentFieldStats[agent.id] = agent.field_count;
-        });
-      }
-      
-      setAgentStats(agentFieldStats);
-    } catch (err) {
-      setError('Failed to fetch agent data');
-      console.error('Agents fetch error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (user?.role === 'admin') fetchData();
+  }, [user?.role, fetchData]);
 
-  if (user?.role !== 'admin') {
-    return (
-      <div className="text-center py-8">
-        <div className="text-red-600 font-medium">Access Denied</div>
-        <div className="text-gray-600 mt-2">Only administrators can view this page.</div>
+  if (user?.role !== 'admin') return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+        <UserIcon className="w-7 h-7 text-red-500" />
       </div>
-    );
-  }
+      <p className="font-semibold text-gray-900">Access Denied</p>
+      <p className="text-sm text-gray-500">Only administrators can view this page.</p>
+    </div>
+  );
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-shamba-green"></div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-shamba-green border-t-transparent"></div>
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="rounded-md bg-red-50 p-4">
-        <div className="text-sm text-red-800">{error}</div>
-      </div>
-    );
-  }
+  if (error) return <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">{error}</div>;
+
+  const totalFields = Object.values(agentStats).reduce((s: number, c: number) => s + c, 0);
+  const avgFields = agents.length > 0 ? (totalFields / agents.length).toFixed(1) : '0';
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
-      <div className="sm:flex sm:items-center">
-        <div className="sm:flex-auto">
-          <h1 className="text-xl font-semibold text-gray-900">Field Agents</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            A list of all field agents and their assigned fields and performance metrics.
-          </p>
-        </div>
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 font-poppins">Field Agents</h1>
+        <p className="text-gray-500 text-sm mt-0.5">Manage and monitor all field agents</p>
       </div>
 
-      {/* Summary Cards */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-shamba-green rounded-md p-3">
-                <UserIcon className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Agents
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {agents.length}
-                  </dd>
-                </dl>
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: 'Total Agents', value: agents.length, icon: UserIcon, color: 'bg-shamba-green' },
+          { label: 'Total Assigned Fields', value: totalFields, icon: ClipboardDocumentListIcon, color: 'bg-blue-500' },
+          { label: 'Avg Fields / Agent', value: avgFields, icon: CheckCircleIcon, color: 'bg-emerald-500' },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</span>
+              <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center shadow-sm`}>
+                <Icon className="w-5 h-5 text-white" />
               </div>
             </div>
+            <p className="text-3xl font-bold text-gray-900">{value}</p>
           </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                <ClipboardDocumentListIcon className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total Assigned Fields
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {Object.values(agentStats).reduce((sum: number, count: number) => sum + count, 0)}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                <CheckCircleIcon className="h-6 w-6 text-white" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Avg Fields per Agent
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900">
-                    {agents.length > 0 
-                      ? (Object.values(agentStats).reduce((sum: number, count: number) => sum + count, 0) / agents.length).toFixed(1)
-                      : '0'
-                    }
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* Agents Table */}
-      <div className="mt-8 flex flex-col">
-        <div className="-my-2 -mx-4 overflow-x-auto sm:-mx-6 lg:-mx-8">
-          <div className="inline-block min-w-full py-2 align-middle md:px-6 lg:px-8">
-            <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-              <table className="min-w-full divide-y divide-gray-300">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                      Agent
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Email
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Assigned Fields
-                    </th>
-                    <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                      Join Date
-                    </th>
-                    <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                      <span className="sr-only">Actions</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {agents.map((agent) => (
-                    <tr key={agent.id}>
-                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                        <div className="flex items-center">
-                          <UserIcon className="h-5 w-5 text-gray-400 mr-2" />
-                          {agent.username}
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        {agent.email}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-shamba-green text-white">
-                            {agentStats[agent.id] || 0} fields
-                          </span>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                        {new Date(agent.created_at || '').toLocaleDateString()}
-                      </td>
-                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                        <button
-                          onClick={() => window.location.href = `/fields?agent=${agent.id}`}
-                          className="text-shamba-green hover:text-shamba-dark-green"
-                        >
-                          View Fields
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {agents.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No agents found
-                </div>
-              )}
-            </div>
-          </div>
+      {/* Agents table */}
+      <div className="card overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900">All Agents</h3>
         </div>
-      </div>
-
-      {/* Agent Performance Insights */}
-      <div className="mt-8 bg-white shadow rounded-lg">
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-            Performance Insights
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Field Distribution</h4>
-              <div className="space-y-2">
-                {agents.map((agent) => {
-                  const fieldCount = agentStats[agent.id] || 0;
-                  const totalFields = Object.values(agentStats).reduce((sum: number, count: number) => sum + count, 0);
-                  const percentage = totalFields > 0 ? (fieldCount / totalFields) * 100 : 0;
-                  
-                  return (
-                    <div key={agent.id} className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">{agent.username}</span>
-                      <div className="flex items-center">
-                        <span className="text-sm text-gray-500 mr-2">{fieldCount} fields</span>
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-shamba-green h-2 rounded-full"
-                            style={{ width: `${percentage}%` }}
-                          ></div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-100">
+            <thead>
+              <tr className="bg-gray-50">
+                {['Agent', 'Email', 'Assigned Fields', 'Workload', 'Joined'].map(h => (
+                  <th key={h} className="px-5 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 bg-white">
+              {agents.map(agent => {
+                const count = agentStats[agent.id] || 0;
+                const pct = totalFields > 0 ? Math.round((count / totalFields) * 100) : 0;
+                const workloadColor = count > 5 ? 'bg-shamba-green' : count > 0 ? 'bg-yellow-400' : 'bg-gray-300';
+                return (
+                  <tr key={agent.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-shamba-green flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <span className="text-white text-sm font-bold">{agent.username[0].toUpperCase()}</span>
                         </div>
+                        <span className="text-sm font-semibold text-gray-900">{agent.username}</span>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Agent Status</h4>
-              <div className="space-y-3">
-                {agents.map((agent) => {
-                  const fieldCount = agentStats[agent.id] || 0;
-                  let status: string = 'inactive';
-                  let statusColor: string = 'bg-gray-100 text-gray-800';
-                  let statusIcon = <ClockIcon className="w-4 h-4" />;
-                  
-                  if (fieldCount > 5) {
-                    status = 'active';
-                    statusColor = 'bg-green-100 text-green-800';
-                    statusIcon = <CheckCircleIcon className="w-4 h-4" />;
-                  } else if (fieldCount > 0) {
-                    status = 'moderate';
-                    statusColor = 'bg-yellow-100 text-yellow-800';
-                    statusIcon = <ExclamationTriangleIcon className="w-4 h-4" />;
-                  }
-                  
-                  return (
-                    <div key={agent.id} className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">{agent.username}</span>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusColor}`}>
-                        {statusIcon}
-                        <span className="ml-1">{status}</span>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-600">{agent.email}</td>
+                    <td className="px-5 py-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                        {count} field{count !== 1 ? 's' : ''}
                       </span>
-                    </div>
-                  );
-                })}
-              </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${workloadColor} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-500">{pct}%</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-gray-500">
+                      {new Date(agent.created_at || '').toLocaleDateString()}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {agents.length === 0 && (
+            <div className="text-center py-16 text-gray-400">
+              <UserIcon className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p className="text-sm font-medium">No agents found</p>
             </div>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Field distribution */}
+      {agents.length > 0 && (
+        <div className="card p-6">
+          <h3 className="font-semibold text-gray-900 mb-5">Field Distribution</h3>
+          <div className="space-y-4">
+            {agents.map(agent => {
+              const count = agentStats[agent.id] || 0;
+              const pct = totalFields > 0 ? Math.round((count / totalFields) * 100) : 0;
+              return (
+                <div key={agent.id}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-shamba-green flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">{agent.username[0].toUpperCase()}</span>
+                      </div>
+                      <span className="font-medium text-gray-700">{agent.username}</span>
+                    </div>
+                    <span className="text-gray-500">{count} fields · {pct}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-shamba-green rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

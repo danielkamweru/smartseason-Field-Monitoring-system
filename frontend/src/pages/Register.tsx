@@ -4,11 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'agent',
+    username: '', email: '', password: '', confirmPassword: '', role: 'agent',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { register, loading, error, clearError } = useAuth();
@@ -16,223 +12,122 @@ const Register = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear field error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-    
-    // Clear auth error when user starts typing
-    if (error) {
-      clearError();
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+    if (error) clearError();
   };
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
-    if (!formData.username) {
-      newErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
-    }
-    
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-    
+    if (!formData.username) newErrors.username = 'Username is required';
+    else if (formData.username.length < 3) newErrors.username = 'Username must be at least 3 characters';
+    if (!formData.email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    if (!formData.confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
+    else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-    
+    if (!validateForm()) return;
     const { confirmPassword, ...registrationData } = formData;
     const result = await register(registrationData);
-    if (result.success) {
-      navigate('/dashboard');
-    }
+    if (result.success) navigate('/dashboard');
   };
 
+  const fields = [
+    { name: 'username', label: 'Username', type: 'text', placeholder: 'johndoe' },
+    { name: 'email', label: 'Email address', type: 'email', placeholder: 'you@example.com' },
+    { name: 'password', label: 'Password', type: 'password', placeholder: '••••••••' },
+    { name: 'confirmPassword', label: 'Confirm Password', type: 'password', placeholder: '••••••••' },
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-shamba-green">
-            <svg className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-            </svg>
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Join SmartSeason to start monitoring your fields
-          </p>
+    <div className="min-h-screen flex">
+      {/* Left panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#14532d] flex-col justify-between p-12">
+        <div className="flex items-center gap-3">
+          <img src="/shamba-logo.jpeg" alt="Shamba" className="w-10 h-10 rounded-xl object-cover shadow-lg" />
+          <span className="text-white font-bold text-xl font-poppins">SmartSeason</span>
         </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Username
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                required
-                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
-                  errors.username ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-shamba-green focus:border-shamba-green focus:z-10 sm:text-sm`}
-                placeholder="Choose a username"
-                value={formData.username}
-                onChange={handleChange}
-              />
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-600">{errors.username}</p>
-              )}
-            </div>
+        <div>
+          <h1 className="text-4xl font-bold text-white font-poppins leading-tight mb-4">
+            Join the SmartSeason<br />community today.
+          </h1>
+          <p className="text-green-300 text-lg leading-relaxed">
+            Create your account and start monitoring fields, tracking growth stages, and managing your agricultural operations.
+          </p>
+          <div className="mt-10 space-y-4">
+            {['Real-time field status tracking', 'Role-based access control', 'Complete update history & audit trail'].map(f => (
+              <div key={f} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-shamba-green flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <span className="text-green-200 text-sm">{f}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <p className="text-green-600 text-sm">© 2026 SmartSeason · Powered by Shamba Records</p>
+      </div>
+
+      {/* Right panel */}
+      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12 overflow-y-auto">
+        <div className="w-full max-w-md">
+          <div className="lg:hidden flex items-center gap-2 mb-8">
+            <img src="/shamba-logo.jpeg" alt="Shamba" className="w-8 h-8 rounded-lg object-cover" />
+            <span className="font-bold text-shamba-dark-green font-poppins">SmartSeason</span>
+          </div>
+
+          <h2 className="text-3xl font-bold text-gray-900 font-poppins mb-1">Create account</h2>
+          <p className="text-gray-500 text-sm mb-8">
+            Already have an account?{' '}
+            <Link to="/login" className="text-shamba-green font-semibold hover:text-shamba-dark-green">
+              Sign in
+            </Link>
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {fields.map(f => (
+              <div key={f.name}>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">{f.label}</label>
+                <input
+                  name={f.name}
+                  type={f.type}
+                  value={(formData as any)[f.name]}
+                  onChange={handleChange}
+                  placeholder={f.placeholder}
+                  className={`input-field ${errors[f.name] ? 'border-red-400 focus:ring-red-400' : ''}`}
+                />
+                {errors[f.name] && <p className="mt-1 text-xs text-red-500">{errors[f.name]}</p>}
+              </div>
+            ))}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
-                  errors.email ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-shamba-green focus:border-shamba-green focus:z-10 sm:text-sm`}
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={handleChange}
-              />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                Role
-              </label>
-              <select
-                id="role"
-                name="role"
-                required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-shamba-green focus:border-shamba-green focus:z-10 sm:text-sm"
-                value={formData.role}
-                onChange={handleChange}
-              >
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Role</label>
+              <select name="role" value={formData.role} onChange={handleChange} className="input-field">
                 <option value="agent">Field Agent</option>
                 <option value="admin">Admin (Coordinator)</option>
               </select>
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
-                  errors.password ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-shamba-green focus:border-shamba-green focus:z-10 sm:text-sm`}
-                placeholder="Create a password"
-                value={formData.password}
-                onChange={handleChange}
-              />
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
-            </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                className={`mt-1 appearance-none relative block w-full px-3 py-2 border ${
-                  errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                } placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-shamba-green focus:border-shamba-green focus:z-10 sm:text-sm`}
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-              {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-              )}
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-800">{error}</div>
-            </div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-shamba-green hover:bg-shamba-dark-green focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-shamba-green disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              ) : null}
+            <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base mt-2">
               {loading ? 'Creating account...' : 'Create account'}
             </button>
-          </div>
-
-          <div className="text-center">
-            <Link
-              to="/login"
-              className="font-medium text-shamba-green hover:text-shamba-dark-green"
-            >
-              Already have an account? Sign in
-            </Link>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );

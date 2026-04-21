@@ -8,6 +8,7 @@ module.exports = {
       colors: {
         'shamba-green': '#22c55e',
         'shamba-dark-green': '#16a34a',
+        'shamba-deeper-green': '#14532d',
         'shamba-light-green': '#86efac',
         'shamba-earth': '#92400e',
         'shamba-sky': '#0ea5e9',

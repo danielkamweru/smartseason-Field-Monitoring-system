@@ -1,37 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { fieldsAPI, usersAPI } from '../services/api';
-import { 
-  ArrowLeftIcon,
-  PencilIcon,
-  CalendarIcon,
-  UserIcon,
-  ChatBubbleLeftRightIcon,
-  CheckCircleIcon
+import { fieldsAPI } from '../services/api';
+import {
+  ArrowLeftIcon, PencilIcon, CalendarIcon, UserIcon,
+  ChatBubbleLeftRightIcon, CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
 interface Field {
-  id: number;
-  name: string;
-  crop_type: string;
-  planting_date: string;
-  current_stage: string;
-  status: string;
-  agent_name?: string;
-  assigned_agent_id?: number;
+  id: number; name: string; crop_type: string; planting_date: string;
+  current_stage: string; status: string; agent_name?: string; assigned_agent_id?: number;
+}
+interface FieldUpdate {
+  id: number; field_id: number; agent_id: number; stage: string;
+  notes?: string; update_date: string; agent_name?: string;
 }
 
-interface FieldUpdate {
-  id: number;
-  field_id: number;
-  agent_id: number;
-  stage: string;
-  notes?: string;
-  update_date: string;
-  created_at?: string;
-  agent_name?: string;
-}
+const stageBadgeClass: Record<string, string> = {
+  planted: 'badge-planted', growing: 'badge-growing', ready: 'badge-ready', harvested: 'badge-harvested',
+};
+const statusBadgeClass: Record<string, string> = {
+  active: 'badge-active', at_risk: 'badge-risk', completed: 'badge-completed',
+};
+const stages = ['planted', 'growing', 'ready', 'harvested'];
 
 const FieldDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,366 +32,215 @@ const FieldDetail = () => {
   const [updates, setUpdates] = useState<FieldUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showStageUpdate, setShowStageUpdate] = useState(false);
-  const [stageFormData, setStageFormData] = useState({
-    stage: '',
-    notes: '',
-  });
+  const [showStageModal, setShowStageModal] = useState(false);
+  const [stageForm, setStageForm] = useState({ stage: '', notes: '' });
 
-  useEffect(() => {
-    if (!id) {
-      setError('Field ID is required');
-      setLoading(false);
-      return;
-    }
-    fetchFieldData();
-  }, [id]);
-
-  const fetchFieldData = async () => {
+  const fetchData = React.useCallback(async () => {
     if (!id) return;
     try {
-      const [fieldResponse, updatesResponse] = await Promise.all([
-        fieldsAPI.getById(id),
-        fieldsAPI.getUpdates(id)
-      ]);
-      setField(fieldResponse.data.field);
-      setUpdates(updatesResponse.data.updates);
-    } catch (err) {
-      setError('Failed to fetch field data');
-      console.error('Field detail error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+      const [fr, ur] = await Promise.all([fieldsAPI.getById(id), fieldsAPI.getUpdates(id)]);
+      setField(fr.data.field);
+      setUpdates(ur.data.updates);
+    } catch { setError('Failed to fetch field data'); }
+    finally { setLoading(false); }
+  }, [id]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'at_risk':
-        return 'bg-red-100 text-red-800';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  useEffect(() => { if (id) fetchData(); }, [id, fetchData]);
 
-  const getStageColor = (stage: string) => {
-    switch (stage) {
-      case 'planted':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'growing':
-        return 'bg-green-100 text-green-800';
-      case 'ready':
-        return 'bg-blue-100 text-blue-800';
-      case 'harvested':
-        return 'bg-purple-100 text-purple-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const handleStageUpdate = async (e: React.FormEvent) => {
+  const handleStageUpdate = React.useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!id) return;
     try {
-      await fieldsAPI.updateStage(id, stageFormData);
-      setShowStageUpdate(false);
-      setStageFormData({ stage: '', notes: '' });
-      fetchFieldData(); // Refresh field data
-    } catch (err) {
-      setError('Failed to update field stage');
-      console.error('Stage update error:', err);
-    }
-  };
+      await fieldsAPI.updateStage(id, stageForm);
+      setShowStageModal(false);
+      setStageForm({ stage: '', notes: '' });
+      fetchData();
+    } catch { setError('Failed to update stage'); }
+  }, [id, stageForm, fetchData]);
 
-  const canUpdateStage = () => {
-    if (user?.role === 'admin') return true;
-    if (user?.role === 'agent' && field?.assigned_agent_id === user.id) return true;
-    return false;
-  };
+  const canUpdate = user?.role === 'admin' || (user?.role === 'agent' && field?.assigned_agent_id === user?.id);
+  const currentStageIdx = stages.indexOf(field?.current_stage || '');
+  const daysSincePlanting = field ? Math.floor((Date.now() - new Date(field.planting_date).getTime()) / 86400000) : 0;
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-shamba-green"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-md bg-red-50 p-4">
-        <div className="text-sm text-red-800">{error}</div>
-      </div>
-    );
-  }
-
-  if (!field) {
-    return (
-      <div className="text-center text-gray-500">
-        Field not found
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-shamba-green border-t-transparent"></div>
+    </div>
+  );
+  if (error) return <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">{error}</div>;
+  if (!field) return <div className="text-center text-gray-500 py-16">Field not found</div>;
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <button
-          onClick={() => navigate('/fields')}
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-4"
-        >
-          <ArrowLeftIcon className="h-4 w-4 mr-1" />
-          Back to Fields
+      <div>
+        <button onClick={() => navigate('/fields')} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-4 transition-colors">
+          <ArrowLeftIcon className="w-4 h-4" /> Back to Fields
         </button>
-        
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{field.name}</h1>
-            <p className="mt-2 text-gray-600">{field.crop_type} Field</p>
+            <h1 className="text-2xl font-bold text-gray-900 font-poppins">{field.name}</h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className={stageBadgeClass[field.current_stage] || 'badge-planted'}>{field.current_stage}</span>
+              <span className={statusBadgeClass[field.status] || 'badge-active'}>{field.status.replace('_', ' ')}</span>
+            </div>
           </div>
-          {canUpdateStage() && (
-            <button
-              onClick={() => setShowStageUpdate(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-shamba-green hover:bg-shamba-dark-green focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-shamba-green"
-            >
-              <PencilIcon className="h-4 w-4 mr-2" />
-              Update Stage
+          {canUpdate && (
+            <button onClick={() => setShowStageModal(true)} className="btn-primary gap-2 flex-shrink-0">
+              <PencilIcon className="w-4 h-4" /> Update Stage
             </button>
           )}
         </div>
       </div>
 
-      {/* Field Information */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
-          {/* Field Details Card */}
-          <div className="bg-white shadow rounded-lg mb-8">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Field Information</h3>
-              <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
-                <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Crop Type</dt>
-                  <dd className="mt-1 text-sm text-gray-900">{field.crop_type}</dd>
-                </div>
-                <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Planting Date</dt>
-                  <dd className="mt-1 text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <CalendarIcon className="h-4 w-4 mr-1 text-gray-400" />
-                      {new Date(field.planting_date || '').toLocaleDateString()}
-                    </div>
-                  </dd>
-                </div>
-                <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Current Stage</dt>
-                  <dd className="mt-1">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStageColor(field.current_stage)}`}>
-                      {field.current_stage}
-                    </span>
-                  </dd>
-                </div>
-                <div className="sm:col-span-1">
-                  <dt className="text-sm font-medium text-gray-500">Status</dt>
-                  <dd className="mt-1">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(field.status)}`}>
-                      {field.status.replace('_', ' ')}
-                    </span>
-                  </dd>
-                </div>
-                {field.agent_name && (
-                  <div className="sm:col-span-2">
-                    <dt className="text-sm font-medium text-gray-500">Assigned Agent</dt>
-                    <dd className="mt-1 text-sm text-gray-900">
-                      <div className="flex items-center">
-                        <UserIcon className="h-4 w-4 mr-1 text-gray-400" />
-                        {field.agent_name}
-                      </div>
-                    </dd>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Field info */}
+          <div className="card p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Field Information</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { label: 'Crop Type', value: field.crop_type },
+                { label: 'Planting Date', value: new Date(field.planting_date).toLocaleDateString(), icon: CalendarIcon },
+                { label: 'Assigned Agent', value: field.agent_name || 'Unassigned', icon: UserIcon },
+                { label: 'Days Since Planting', value: `${daysSincePlanting} days` },
+              ].map(({ label, value, icon: Icon }) => (
+                <div key={label} className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+                  <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-900">
+                    {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+                    {value}
                   </div>
-                )}
-              </dl>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Update History */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                Update History
-              </h3>
-              {updates.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No updates recorded yet
-                </div>
-              ) : (
-                <div className="flow-root">
-                  <ul className="-mb-8">
-                    {updates.map((update, index) => (
-                      <li key={update.id}>
-                        <div className="relative pb-8">
-                          {index !== updates.length - 1 ? (
-                            <span className="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                          ) : null}
-                          <div className="relative flex items-start space-x-3">
-                            <div className="relative">
-                              <CheckCircleIcon className="h-10 w-10 rounded-full bg-shamba-green text-white p-2" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-gray-900">
-                                <span className="font-semibold">{update.agent_name}</span> updated stage to{' '}
-                                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStageColor(update.stage)}`}>
-                                  {update.stage}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-500">
-                                {new Date(update.update_date).toLocaleDateString()} at {new Date(update.update_date).toLocaleTimeString()}
-                              </p>
-                              {update.notes && (
-                                <div className="mt-2 text-sm text-gray-700 bg-gray-50 rounded-lg p-3">
-                                  <ChatBubbleLeftRightIcon className="h-4 w-4 inline mr-1 text-gray-400" />
-                                  {update.notes}
-                                </div>
-                              )}
-                            </div>
-                          </div>
+          {/* Update history */}
+          <div className="card p-6">
+            <h3 className="font-semibold text-gray-900 mb-5">Update History</h3>
+            {updates.length === 0 ? (
+              <div className="text-center py-10 text-gray-400">
+                <ChatBubbleLeftRightIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">No updates recorded yet</p>
+              </div>
+            ) : (
+              <div className="space-y-0">
+                {updates.map((update, i) => (
+                  <div key={update.id} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="w-8 h-8 rounded-full bg-shamba-green flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <CheckCircleIcon className="w-4 h-4 text-white" />
+                      </div>
+                      {i < updates.length - 1 && <div className="w-0.5 flex-1 bg-gray-200 my-1" />}
+                    </div>
+                    <div className={`pb-6 flex-1 ${i === updates.length - 1 ? '' : ''}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900">{update.agent_name}</span>
+                        <span className="text-xs text-gray-400">updated stage to</span>
+                        <span className={stageBadgeClass[update.stage] || 'badge-planted'}>{update.stage}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(update.update_date).toLocaleDateString()} at {new Date(update.update_date).toLocaleTimeString()}
+                      </p>
+                      {update.notes && (
+                        <div className="mt-2 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-700 border border-gray-100">
+                          {update.notes}
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Sidebar */}
-        <div className="lg:col-span-1">
-          {/* Quick Stats */}
-          <div className="bg-white shadow rounded-lg mb-6">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Quick Stats</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Days since planting</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {Math.floor((new Date().getTime() - new Date(field.planting_date || '').getTime()) / (1000 * 60 * 60 * 24))}
-                  </span>
+        <div className="space-y-6">
+          {/* Quick stats */}
+          <div className="card p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Quick Stats</h3>
+            <div className="space-y-3">
+              {[
+                { label: 'Days since planting', value: daysSincePlanting },
+                { label: 'Total updates', value: updates.length },
+                { label: 'Last updated', value: updates.length > 0 ? new Date(updates[0].update_date).toLocaleDateString() : 'Never' },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                  <span className="text-sm text-gray-500">{label}</span>
+                  <span className="text-sm font-semibold text-gray-900">{value}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Total updates</span>
-                  <span className="text-sm font-medium text-gray-900">{updates.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Last updated</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {updates.length > 0 
-                      ? new Date(updates[0].update_date).toLocaleDateString()
-                      : 'Never'
-                    }
-                  </span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Stage Progress */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Growth Progress</h3>
-              <div className="space-y-3">
-                {['planted', 'growing', 'ready', 'harvested'].map((stage, index) => {
-                  const isCurrentStage = field.current_stage === stage;
-                  const isPastStage = ['planted', 'growing', 'ready', 'harvested'].indexOf(field.current_stage) > index;
-                  
-                  return (
-                    <div key={stage} className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        isPastStage || isCurrentStage ? 'bg-shamba-green' : 'bg-gray-300'
-                      }`}>
-                        <CheckCircleIcon className="h-5 w-5 text-white" />
-                      </div>
-                      <div className="ml-3 flex-1">
-                        <div className={`text-sm font-medium ${
-                          isCurrentStage ? 'text-shamba-green' : isPastStage ? 'text-gray-600' : 'text-gray-400'
-                        }`}>
-                          {stage.charAt(0).toUpperCase() + stage.slice(1)}
-                        </div>
-                      </div>
+          {/* Growth progress */}
+          <div className="card p-6">
+            <h3 className="font-semibold text-gray-900 mb-5">Growth Progress</h3>
+            <div className="space-y-3">
+              {stages.map((stage, idx) => {
+                const done = idx <= currentStageIdx;
+                const current = idx === currentStageIdx;
+                return (
+                  <div key={stage} className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${done ? 'bg-shamba-green shadow-sm' : 'bg-gray-100'}`}>
+                      {done
+                        ? <CheckCircleIcon className="w-4 h-4 text-white" />
+                        : <span className="w-2 h-2 rounded-full bg-gray-300" />}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium capitalize ${current ? 'text-shamba-dark-green' : done ? 'text-gray-700' : 'text-gray-400'}`}>
+                        {stage}
+                      </p>
+                      {current && <p className="text-xs text-shamba-green font-semibold">Current stage</p>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stage Update Modal */}
-      {showStageUpdate && (
-        <div className="fixed inset-0 overflow-y-auto z-50">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+      {/* Stage update modal */}
+      {showStageModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 py-5 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900 font-poppins">Update Field Stage</h3>
             </div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <form onSubmit={handleStageUpdate}>
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                    Update Field Stage
-                  </h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">New Stage</label>
-                      <select
-                        required
-                        value={stageFormData.stage}
-                        onChange={(e) => setStageFormData({...stageFormData, stage: e.target.value})}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-shamba-green focus:ring-shamba-green sm:text-sm"
-                      >
-                        <option value="">Select a stage</option>
-                        <option value="planted">Planted</option>
-                        <option value="growing">Growing</option>
-                        <option value="ready">Ready</option>
-                        <option value="harvested">Harvested</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
-                      <textarea
-                        rows={3}
-                        value={stageFormData.notes}
-                        onChange={(e) => setStageFormData({...stageFormData, notes: e.target.value})}
-                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-shamba-green focus:ring-shamba-green sm:text-sm"
-                        placeholder="Add any observations or notes about this update..."
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="submit"
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-shamba-green text-base font-medium text-white hover:bg-shamba-dark-green focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-shamba-green sm:ml-3 sm:w-auto sm:text-sm"
+            <form onSubmit={handleStageUpdate}>
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">New Stage</label>
+                  <select
+                    required
+                    value={stageForm.stage}
+                    onChange={e => setStageForm({ ...stageForm, stage: e.target.value })}
+                    className="input-field"
                   >
-                    Update Stage
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowStageUpdate(false);
-                      setStageFormData({ stage: '', notes: '' });
-                    }}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-shamba-green sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                  >
-                    Cancel
-                  </button>
+                    <option value="">Select a stage</option>
+                    {stages.map(s => <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                  </select>
                 </div>
-              </form>
-            </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Notes <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <textarea
+                    rows={3}
+                    value={stageForm.notes}
+                    onChange={e => setStageForm({ ...stageForm, notes: e.target.value })}
+                    placeholder="Add observations about this update..."
+                    className="input-field resize-none"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-gray-50 rounded-b-2xl flex justify-end gap-3">
+                <button type="button" onClick={() => setShowStageModal(false)} className="btn-secondary">Cancel</button>
+                <button type="submit" className="btn-primary">Update Stage</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

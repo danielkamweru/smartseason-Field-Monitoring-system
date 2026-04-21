@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { authAPI } from '../services/api';
-import { User, AuthState } from '../types';
+import { AuthState } from '../types';
 
 // Initial state
 const initialState: AuthState = {
