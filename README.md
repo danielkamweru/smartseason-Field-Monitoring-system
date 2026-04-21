@@ -85,16 +85,15 @@ The system automatically calculates field status based on:
 ### 1. Clone and Install Dependencies
 
 ```bash
-# Clone the repository
 git clone <repository-url>
 cd Field-Monitoring-system
 
 # Install backend dependencies
-cd server
+cd backend
 npm install
 
 # Install frontend dependencies
-cd ../client
+cd ../frontend
 npm install
 ```
 
@@ -104,45 +103,48 @@ npm install
 # Create PostgreSQL database
 createdb smartseason
 
-# Import the database schema
-psql -d smartseason -f server/database/init.sql
+# Run schema and seed data
+psql -d smartseason -f backend/database/init.sql
 ```
 
 ### 3. Environment Configuration
 
-Create a `.env` file in the `server` directory:
+Create a `.env` file in the `backend` directory:
 
 ```env
 PORT=5000
+JWT_SECRET=your_jwt_secret_key_here_change_in_production
+NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
+
+# PostgreSQL
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=smartseason
 DB_USER=postgres
 DB_PASSWORD=your_password
-JWT_SECRET=your_jwt_secret_key_here_change_in_production
-NODE_ENV=development
 ```
 
-Create a `.env` file in the `client` directory:
+Create a `.env` file in the `frontend` directory:
 
 ```env
-VITE_API_URL=http://localhost:5000/api
+REACT_APP_API_URL=http://localhost:5000/api
 ```
 
 ### 4. Start the Application
 
 ```bash
-# Start the backend server (from server directory)
-cd server
+# Start the backend (from backend directory)
+cd backend
 npm run dev
 
-# Start the frontend development server (from client directory)
-cd ../client
-npm start
+# Start the frontend (from frontend directory)
+cd ../frontend
+npm run dev
 ```
 
 The application will be available at:
-- Frontend: http://localhost:5173
+- Frontend: http://localhost:3000
 - Backend API: http://localhost:5000
 
 ## Demo Credentials
@@ -151,8 +153,8 @@ The application will be available at:
 - **Email**: admin@smartseason.com
 - **Password**: password
 
-### Field Agent Account
-- **Email**: agent1@smartseason.com
+### Field Agent Accounts
+- **Email**: agent1@smartseason.com / agent2@smartseason.com
 - **Password**: password
 
 ## API Endpoints
@@ -175,24 +177,74 @@ The application will be available at:
 ### Users
 - `GET /api/users/agents` - Get all field agents (admin only)
 
+## Deployment
+
+### Frontend → Vercel, Backend → Render
+
+#### 1. Deploy Backend on Render
+
+1. Push your code to GitHub
+2. Go to [render.com](https://render.com) and create a new **Web Service**
+3. Connect your GitHub repository and set the **Root Directory** to `backend`
+4. Configure:
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+5. Create a **PostgreSQL** instance on Render and note the connection details
+6. Add the following **Environment Variables** in Render's dashboard:
+   ```
+   PORT=5000
+   NODE_ENV=production
+   JWT_SECRET=your_secure_secret_key
+   FRONTEND_URL=https://your-app.vercel.app
+   DB_HOST=your-render-postgres-host
+   DB_PORT=5432
+   DB_NAME=smartseason
+   DB_USER=your-db-user
+   DB_PASSWORD=your-db-password
+   ```
+7. Run the schema on your Render PostgreSQL instance:
+   ```bash
+   psql -h your-render-postgres-host -U your-db-user -d smartseason -f backend/database/init.sql
+   ```
+8. Note your Render backend URL (e.g. `https://smartseason-api.onrender.com`)
+
+#### 2. Deploy Frontend on Vercel
+
+1. Go to [vercel.com](https://vercel.com) and create a new project
+2. Import your GitHub repository and set the **Root Directory** to `frontend`
+3. Configure:
+   - **Framework Preset**: Create React App
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `build`
+4. Add the following **Environment Variable**:
+   ```
+   REACT_APP_API_URL=https://your-smartseason-api.onrender.com/api
+   ```
+5. Deploy — Vercel handles SPA routing automatically via `vercel.json`
+
+#### 3. Update Backend CORS
+
+Once you have your Vercel URL, ensure the `FRONTEND_URL` on Render matches it exactly:
+```
+FRONTEND_URL=https://your-app.vercel.app
+```
+
 ## Design Decisions
 
 ### 1. Status Logic Implementation
 The field status is calculated dynamically based on the current stage and time elapsed since planting:
 
-- **Planted > 30 days**: At Risk (should be growing by now)
-- **Growing > 120 days**: At Risk (taking too long to mature)
-- **Ready > 150 days**: At Risk (should be harvested)
-- **Harvested**: Completed (final state)
-
-This approach provides automated risk detection while allowing manual intervention through stage updates.
+- **Planted > 30 days**: At Risk
+- **Growing > 120 days**: At Risk
+- **Ready > 150 days**: At Risk
+- **Harvested**: Completed
 
 ### 2. Role-Based Access Control
 - **Admin**: Full access to all fields, can create/assign fields, view all updates
 - **Field Agent**: Can only view assigned fields, update stages, and add observations
 
 ### 3. Database Design
-- **Normalized Schema**: Separate tables for users, fields, and updates to avoid data duplication
+- **Normalized Schema**: Separate tables for users, fields, and updates
 - **Foreign Key Constraints**: Ensure data integrity between related entities
 - **Indexes**: Optimized for common query patterns (agent assignments, field lookups)
 
@@ -206,106 +258,11 @@ This approach provides automated risk detection while allowing manual interventi
 - **Password Hashing**: bcrypt for secure password storage
 - **JWT Tokens**: Stateless authentication with expiration
 - **Input Validation**: Server-side validation for all user inputs
-- **CORS Configuration**: Proper cross-origin resource sharing setup
-
-## Assumptions Made
-
-1. **Time-Based Status**: The risk assessment logic assumes typical crop growth timelines. These thresholds can be adjusted based on specific crop requirements.
-
-2. **Single Agent Assignment**: Each field is assigned to exactly one field agent for clear responsibility.
-
-3. **Sequential Stage Progression**: Fields progress through stages in order (Planted -> Growing -> Ready -> Harvested).
-
-4. **Local Development**: The setup assumes local PostgreSQL installation. For production, consider cloud database solutions.
-
-5. **Basic Notifications**: The system doesn't include email notifications but can be extended to add alerts for at-risk fields.
-
-## Future Enhancements
-
-- **Email Notifications**: Automated alerts for at-risk fields
-- **Mobile App**: Native mobile application for field agents
-- **Advanced Analytics**: Historical data analysis and trend reporting
-- **Image Upload**: Visual field documentation with photos
-- **Weather Integration**: Weather data integration for better risk assessment
-- **Multi-Tenant Support**: Support for multiple farms/organizations
-
-## Testing
-
-The application includes:
-- **API Testing**: Manual testing through Postman or similar tools
-- **Frontend Testing**: User interface testing through browser
-- **Integration Testing**: End-to-end workflow verification
-
-## Deployment
-
-### Option 1: Deploy to Vercel (Frontend) + Render (Backend)
-
-#### Backend Deployment (Render/Railway)
-1. Push your code to GitHub
-2. Create a new Web Service on Render or Railway
-3. Connect your GitHub repository
-4. Configure the following:
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Environment Variables**:
-     ```
-     PORT=5000
-     DB_HOST=your-postgres-host
-     DB_PORT=5432
-     DB_NAME=smartseason
-     DB_USER=your-db-user
-     DB_PASSWORD=your-db-password
-     JWT_SECRET=your-secure-secret-key
-     ```
-5. Create a PostgreSQL database on the same platform
-6. Run the database schema (see `server/database/init.sql`)
-
-#### Frontend Deployment (Vercel)
-1. Install Vercel CLI: `npm i -g vercel`
-2. Or deploy directly from Vercel
-3. Configure environment variable:
-   ```
-   VITE_API_URL=https://your-backend-url.onrender.com/api
-   ```
-4. For production, update `src/services/api.ts` to use the production API URL
-
-### Option 2: Deploy Both on Render
-1. Create a Render account
-2. Deploy backend as a Web Service
-3. Deploy frontend as a Static Site with publish directory as `dist`
-4. Add redirect rule for SPA: `/` -> `/index.html`
-
-### Option 3: Docker Deployment
-Create a `Dockerfile` in the root:
-
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-# Install dependencies
-COPY server/package*.json ./server/
-COPY client/package*.json ./client/
-
-RUN cd server && npm install
-RUN cd client && npm install
-
-# Copy source code
-COPY . .
-
-# Build frontend
-RUN cd client && npm run build
-
-# Expose ports
-EXPOSE 5000
-
-# Start backend
-CMD ["cd", "server", "npm", "start"]
-```
+- **CORS Configuration**: Restricted to the configured `FRONTEND_URL`
 
 ## Theme and Styling
 
-The application uses a custom theme inspired by Shamba Records, with agricultural-focused colors:
+Custom theme inspired by Shamba Records with agricultural-focused colors:
 
 - **Primary Green**: `#22c55e` (shamba-green)
 - **Dark Green**: `#16a34a` (shamba-dark-green)
@@ -314,11 +271,14 @@ The application uses a custom theme inspired by Shamba Records, with agricultura
 - **Sky Blue**: `#0ea5e9` (shamba-sky)
 - **Yellow**: `#eab308` (shamba-yellow)
 
-The design emphasizes clean, modern interfaces with agricultural context, using the Inter and Poppins font families for professional readability.
+## Future Enhancements
 
-## Support
-
-For issues or questions, please refer to the code documentation or contact the development team.
+- Email notifications for at-risk fields
+- Native mobile application for field agents
+- Historical data analysis and trend reporting
+- Image upload for visual field documentation
+- Weather data integration for better risk assessment
+- Multi-tenant support for multiple farms/organizations
 
 ## License
 
