@@ -1,0 +1,19 @@
+{
+  "name": "smartseason-field-monitoring",
+  "version": "1.0.0",
+  "description": "SmartSeason Field Monitoring System - Track crop progress across multiple fields",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && npm run dev",
+    "client": "cd frontend && npm start",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": ["agriculture", "field-monitoring", "crop-tracking"],
+  "author": "SmartSeason Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
