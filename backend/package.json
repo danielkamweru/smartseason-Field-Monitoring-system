@@ -1,0 +1,28 @@
+{
+  "name": "smartseason-server",
+  "version": "1.0.0",
+  "description": "Backend API for SmartSeason Field Monitoring System",
+  "main": "index-sqlite.js",
+  "scripts": {
+    "start": "node index-sqlite.js",
+    "dev": "nodemon index-sqlite.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "pg": "^8.20.0",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.1",
+    "supertest": "^6.3.3"
+  }
+}
