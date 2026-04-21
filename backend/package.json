@@ -2,10 +2,10 @@
   "name": "smartseason-server",
   "version": "1.0.0",
   "description": "Backend API for SmartSeason Field Monitoring System",
-  "main": "index-sqlite.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node index-sqlite.js",
-    "dev": "nodemon index-sqlite.js",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
     "test": "jest"
   },
   "dependencies": {

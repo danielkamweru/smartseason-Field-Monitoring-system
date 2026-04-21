@@ -11,6 +11,49 @@ router.use((req, res, next) => {
   next();
 });
 
+// Get dashboard statistics
+router.get('/stats/dashboard', authenticateToken, async (req, res) => {
+  try {
+    const pool = req.pool;
+    let stats;
+
+    if (req.user.role === 'admin') {
+      const totalFieldsResult = await pool.query('SELECT COUNT(*) as count FROM fields');
+      const statusBreakdownResult = await pool.query('SELECT status, COUNT(*) as count FROM fields GROUP BY status');
+      const stageBreakdownResult = await pool.query('SELECT current_stage, COUNT(*) as count FROM fields GROUP BY current_stage');
+      const agentStatsResult = await pool.query(`
+        SELECT u.id, u.username, COUNT(f.id) as field_count 
+        FROM users u 
+        LEFT JOIN fields f ON u.id = f.assigned_agent_id 
+        WHERE u.role = 'agent' 
+        GROUP BY u.id, u.username
+      `);
+
+      stats = {
+        totalFields: parseInt(totalFieldsResult.rows[0].count),
+        statusBreakdown: statusBreakdownResult.rows,
+        stageBreakdown: stageBreakdownResult.rows,
+        agentStats: agentStatsResult.rows
+      };
+    } else {
+      const totalFieldsResult = await pool.query('SELECT COUNT(*) as count FROM fields WHERE assigned_agent_id = $1', [req.user.id]);
+      const statusBreakdownResult = await pool.query('SELECT status, COUNT(*) as count FROM fields WHERE assigned_agent_id = $1 GROUP BY status', [req.user.id]);
+      const stageBreakdownResult = await pool.query('SELECT current_stage, COUNT(*) as count FROM fields WHERE assigned_agent_id = $1 GROUP BY current_stage', [req.user.id]);
+
+      stats = {
+        totalFields: parseInt(totalFieldsResult.rows[0].count),
+        statusBreakdown: statusBreakdownResult.rows,
+        stageBreakdown: stageBreakdownResult.rows
+      };
+    }
+
+    res.json({ stats });
+  } catch (error) {
+    console.error('Get dashboard stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboard statistics' });
+  }
+});
+
 // Get all fields (admin sees all, agent sees assigned)
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -342,51 +385,6 @@ router.get('/:id/updates', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Get field updates error:', error);
     res.status(500).json({ error: 'Failed to fetch field updates' });
-  }
-});
-
-// Get dashboard statistics
-router.get('/stats/dashboard', authenticateToken, async (req, res) => {
-  try {
-    const pool = req.pool;
-    let stats;
-
-    if (req.user.role === 'admin') {
-      // Admin sees all statistics
-      const totalFieldsResult = await pool.query('SELECT COUNT(*) as count FROM fields');
-      const statusBreakdownResult = await pool.query('SELECT status, COUNT(*) as count FROM fields GROUP BY status');
-      const stageBreakdownResult = await pool.query('SELECT current_stage, COUNT(*) as count FROM fields GROUP BY current_stage');
-      const agentStatsResult = await pool.query(`
-        SELECT u.id, u.username, COUNT(f.id) as field_count 
-        FROM users u 
-        LEFT JOIN fields f ON u.id = f.assigned_agent_id 
-        WHERE u.role = 'agent' 
-        GROUP BY u.id, u.username
-      `);
-
-      stats = {
-        totalFields: parseInt(totalFieldsResult.rows[0].count),
-        statusBreakdown: statusBreakdownResult.rows,
-        stageBreakdown: stageBreakdownResult.rows,
-        agentStats: agentStatsResult.rows
-      };
-    } else {
-      // Agent sees only their assigned fields
-      const totalFieldsResult = await pool.query('SELECT COUNT(*) as count FROM fields WHERE assigned_agent_id = $1', [req.user.id]);
-      const statusBreakdownResult = await pool.query('SELECT status, COUNT(*) as count FROM fields WHERE assigned_agent_id = $1 GROUP BY status', [req.user.id]);
-      const stageBreakdownResult = await pool.query('SELECT current_stage, COUNT(*) as count FROM fields WHERE assigned_agent_id = $1 GROUP BY current_stage', [req.user.id]);
-
-      stats = {
-        totalFields: parseInt(totalFieldsResult.rows[0].count),
-        statusBreakdown: statusBreakdownResult.rows,
-        stageBreakdown: stageBreakdownResult.rows
-      };
-    }
-
-    res.json({ stats });
-  } catch (error) {
-    console.error('Get dashboard stats error:', error);
-    res.status(500).json({ error: 'Failed to fetch dashboard statistics' });
   }
 });
 

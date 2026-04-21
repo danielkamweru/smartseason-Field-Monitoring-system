@@ -29,6 +29,45 @@ const calculateFieldStatus = (field) => {
   return 'active';
 };
 
+// Get dashboard statistics — must be before /:id
+router.get('/stats/dashboard', authenticateToken, (req, res) => {
+  const db = req.db;
+
+  if (req.user.role === 'admin') {
+    db.get('SELECT COUNT(*) as count FROM fields', (err, totalResult) => {
+      if (err) return res.status(500).json({ error: 'Failed to fetch total fields' });
+
+      db.all('SELECT status, COUNT(*) as count FROM fields GROUP BY status', (err, statusRows) => {
+        if (err) return res.status(500).json({ error: 'Failed to fetch status breakdown' });
+
+        db.all('SELECT current_stage, COUNT(*) as count FROM fields GROUP BY current_stage', (err, stageRows) => {
+          if (err) return res.status(500).json({ error: 'Failed to fetch stage breakdown' });
+
+          db.all(`SELECT u.id, u.username, COUNT(f.id) as field_count FROM users u LEFT JOIN fields f ON u.id = f.assigned_agent_id WHERE u.role = 'agent' GROUP BY u.id, u.username`, (err, agentRows) => {
+            if (err) return res.status(500).json({ error: 'Failed to fetch agent stats' });
+
+            res.json({ stats: { totalFields: totalResult.count, statusBreakdown: statusRows, stageBreakdown: stageRows, agentStats: agentRows } });
+          });
+        });
+      });
+    });
+  } else {
+    db.get('SELECT COUNT(*) as count FROM fields WHERE assigned_agent_id = ?', [req.user.id], (err, totalResult) => {
+      if (err) return res.status(500).json({ error: 'Failed to fetch total fields' });
+
+      db.all('SELECT status, COUNT(*) as count FROM fields WHERE assigned_agent_id = ? GROUP BY status', [req.user.id], (err, statusRows) => {
+        if (err) return res.status(500).json({ error: 'Failed to fetch status breakdown' });
+
+        db.all('SELECT current_stage, COUNT(*) as count FROM fields WHERE assigned_agent_id = ? GROUP BY current_stage', [req.user.id], (err, stageRows) => {
+          if (err) return res.status(500).json({ error: 'Failed to fetch stage breakdown' });
+
+          res.json({ stats: { totalFields: totalResult.count, statusBreakdown: statusRows, stageBreakdown: stageRows } });
+        });
+      });
+    });
+  }
+});
+
 // Get all fields
 router.get('/', authenticateToken, (req, res) => {
   const db = req.db;
@@ -149,6 +188,68 @@ router.post('/', [
   );
 });
 
+// Update field (admin only)
+router.put('/:id', [
+  authenticateToken,
+  requireRole(['admin']),
+  body('name').optional().notEmpty().withMessage('Field name cannot be empty'),
+  body('crop_type').optional().notEmpty().withMessage('Crop type cannot be empty'),
+  body('planting_date').optional().isISO8601().withMessage('Valid planting date required')
+], (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const fieldId = req.params.id;
+  const { name, crop_type, planting_date, assigned_agent_id } = req.body;
+  const db = req.db;
+
+  db.get('SELECT id FROM fields WHERE id = ?', [fieldId], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (!row) return res.status(404).json({ error: 'Field not found' });
+
+    const updates = [];
+    const values = [];
+
+    if (name !== undefined) { updates.push('name = ?'); values.push(name); }
+    if (crop_type !== undefined) { updates.push('crop_type = ?'); values.push(crop_type); }
+    if (planting_date !== undefined) { updates.push('planting_date = ?'); values.push(planting_date); }
+    if (assigned_agent_id !== undefined) { updates.push('assigned_agent_id = ?'); values.push(assigned_agent_id || null); }
+
+    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+    updates.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(fieldId);
+
+    db.run(`UPDATE fields SET ${updates.join(', ')} WHERE id = ?`, values, (err) => {
+      if (err) return res.status(500).json({ error: 'Failed to update field' });
+
+      db.get('SELECT f.*, u.username as agent_name FROM fields f LEFT JOIN users u ON f.assigned_agent_id = u.id WHERE f.id = ?', [fieldId], (err, updatedRow) => {
+        if (err) return res.status(500).json({ error: 'Failed to retrieve updated field' });
+
+        res.json({ message: 'Field updated successfully', field: { ...updatedRow, status: calculateFieldStatus(updatedRow) } });
+      });
+    });
+  });
+});
+
+// Delete field (admin only)
+router.delete('/:id', [authenticateToken, requireRole(['admin'])], (req, res) => {
+  const fieldId = req.params.id;
+  const db = req.db;
+
+  db.get('SELECT id FROM fields WHERE id = ?', [fieldId], (err, row) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (!row) return res.status(404).json({ error: 'Field not found' });
+
+    db.run('DELETE FROM fields WHERE id = ?', [fieldId], (err) => {
+      if (err) return res.status(500).json({ error: 'Failed to delete field' });
+      res.json({ message: 'Field deleted successfully' });
+    });
+  });
+});
+
 // Update field stage
 router.put('/:id/stage', [
   authenticateToken,
@@ -220,7 +321,7 @@ router.put('/:id/stage', [
   });
 });
 
-// Get field updates
+// Get field updates — must be before /:id catch but after /:id/stage
 router.get('/:id/updates', authenticateToken, (req, res) => {
   const fieldId = req.params.id;
   const db = req.db;
@@ -252,86 +353,6 @@ router.get('/:id/updates', authenticateToken, (req, res) => {
       }
     );
   });
-});
-
-// Get dashboard statistics
-router.get('/stats/dashboard', authenticateToken, (req, res) => {
-  const db = req.db;
-
-  if (req.user.role === 'admin') {
-    // Admin sees all statistics
-    db.get('SELECT COUNT(*) as count FROM fields', (err, totalResult) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to fetch total fields' });
-      }
-
-      const totalFields = totalResult.count;
-
-      db.all('SELECT status, COUNT(*) as count FROM fields GROUP BY status', (err, statusRows) => {
-        if (err) {
-          return res.status(500).json({ error: 'Failed to fetch status breakdown' });
-        }
-
-        db.all('SELECT current_stage, COUNT(*) as count FROM fields GROUP BY current_stage', (err, stageRows) => {
-          if (err) {
-            return res.status(500).json({ error: 'Failed to fetch stage breakdown' });
-          }
-
-          db.all(`
-            SELECT u.id, u.username, COUNT(f.id) as field_count 
-            FROM users u 
-            LEFT JOIN fields f ON u.id = f.assigned_agent_id 
-            WHERE u.role = 'agent' 
-            GROUP BY u.id, u.username
-          `, (err, agentRows) => {
-            if (err) {
-              return res.status(500).json({ error: 'Failed to fetch agent stats' });
-            }
-
-            res.json({
-              stats: {
-                totalFields,
-                statusBreakdown: statusRows,
-                stageBreakdown: stageRows,
-                agentStats: agentRows
-              }
-            });
-          });
-        });
-      });
-    });
-  } else {
-    // Agent sees only their assigned fields
-    db.get('SELECT COUNT(*) as count FROM fields WHERE assigned_agent_id = ?', [req.user.id], (err, totalResult) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to fetch total fields' });
-      }
-
-      const totalFields = totalResult.count;
-
-      db.all('SELECT status, COUNT(*) as count FROM fields WHERE assigned_agent_id = ? GROUP BY status', 
-        [req.user.id], (err, statusRows) => {
-        if (err) {
-          return res.status(500).json({ error: 'Failed to fetch status breakdown' });
-        }
-
-        db.all('SELECT current_stage, COUNT(*) as count FROM fields WHERE assigned_agent_id = ? GROUP BY current_stage', 
-          [req.user.id], (err, stageRows) => {
-          if (err) {
-            return res.status(500).json({ error: 'Failed to fetch stage breakdown' });
-          }
-
-          res.json({
-            stats: {
-              totalFields,
-              statusBreakdown: statusRows,
-              stageBreakdown: stageRows
-            }
-          });
-        });
-      });
-    });
-  }
 });
 
 module.exports = router;
