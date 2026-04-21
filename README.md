@@ -285,4 +285,4 @@ SQLite is used for local development convenience (`index-sqlite.js`). PostgreSQL
 
 ## License
 
-MIT License © 2026 SmartSeason · Powered by Shamba Records
+This project is licensed under the [MIT License](./LICENSE) © 2026 SmartSeason · Powered by Shamba Records
