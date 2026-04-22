@@ -14,7 +14,10 @@ const port = process.env.PORT || 5000;
 app.use(helmet());
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? process.env.FRONTEND_URL || 'https://smartseason-field-monitoring-system.vercel.app'
+    ? [
+        'https://smartseason-field-monitoring-system.vercel.app',
+        'https://smartseason-field-monitoring-system.vercel.app/'
+      ]
     : ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true,
 }));
