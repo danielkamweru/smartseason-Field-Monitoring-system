@@ -37,6 +37,35 @@ app.use('/api/auth', authRoutes);
 app.use('/api/fields', fieldRoutes);
 app.use('/api/users', userRoutes);
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'SmartSeason Field Monitoring System API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/api/health',
+      auth: {
+        login: '/api/auth/login',
+        register: '/api/auth/register',
+        me: '/api/auth/me'
+      },
+      fields: {
+        all: '/api/fields',
+        byId: '/api/fields/:id',
+        create: '/api/fields',
+        update: '/api/fields/:id',
+        delete: '/api/fields/:id',
+        updates: '/api/fields/:id/updates',
+        dashboard: '/api/fields/stats/dashboard'
+      },
+      users: {
+        agents: '/api/users/agents'
+      }
+    },
+    frontend: 'https://smartseason-field-monitoring-system.vercel.app'
+  });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
