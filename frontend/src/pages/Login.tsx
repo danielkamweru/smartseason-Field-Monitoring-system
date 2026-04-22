@@ -33,60 +33,56 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen bg-gray-50 lg:flex">
       {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#14532d] flex-col justify-between p-12">
+      <div className="lg:w-1/2 bg-[#14532d] flex flex-col justify-between p-8 sm:p-12"
+        style={{ minHeight: '100vh' }}>
         <div className="flex flex-col items-center gap-4">
           <img
             src="/shamba-logo.jpeg"
             alt="Shamba Records"
-            className="w-32 h-32 rounded-3xl object-cover shadow-2xl ring-4 ring-green-700"
+            className="w-24 h-24 sm:w-32 sm:h-32 rounded-3xl object-cover shadow-2xl ring-4 ring-green-700"
           />
           <div className="text-center">
-            <p className="text-white font-bold text-2xl font-poppins">SmartSeason</p>
+            <p className="text-white font-bold text-xl sm:text-2xl font-poppins">SmartSeason</p>
             <p className="text-green-400 text-sm mt-0.5">Powered by Shamba Records</p>
           </div>
         </div>
-        <div>
-          <h1 className="text-4xl font-bold text-white font-poppins leading-tight mb-4">
+        <div className="mt-8 lg:mt-0">
+          <h1 className="text-2xl sm:text-4xl font-bold text-white font-poppins leading-tight mb-4">
             Monitor your fields,<br />grow your harvest.
           </h1>
-          <p className="text-green-300 text-lg leading-relaxed">
+          <p className="text-green-300 text-base sm:text-lg leading-relaxed">
             Track crop progress, manage field agents, and get real-time insights across all your fields.
           </p>
-          <div className="mt-10 grid grid-cols-3 gap-4">
+          <div className="mt-8 grid grid-cols-3 gap-3 sm:gap-4">
             {[
               { label: 'Fields Tracked', value: '500+' },
               { label: 'Active Agents', value: '50+' },
               { label: 'Harvests Done', value: '1.2K' },
             ].map(stat => (
-              <div key={stat.label} className="bg-green-800/50 rounded-2xl p-4">
-                <p className="text-shamba-green text-2xl font-bold">{stat.value}</p>
+              <div key={stat.label} className="bg-green-800/50 rounded-2xl p-3 sm:p-4">
+                <p className="text-shamba-green text-xl sm:text-2xl font-bold">{stat.value}</p>
                 <p className="text-green-300 text-xs mt-1">{stat.label}</p>
               </div>
             ))}
           </div>
         </div>
-        <p className="text-green-600 text-sm">© 2026 SmartSeason</p>
+        <p className="text-green-600 text-sm mt-8 lg:mt-0">© 2026 SmartSeason</p>
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50 px-6 py-12">
+      <div className="lg:w-1/2 flex items-center justify-center bg-gray-50 px-4 sm:px-8 py-10 sm:py-12">
         <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <img src="/shamba-logo.jpeg" alt="Shamba" className="w-8 h-8 rounded-lg object-cover" />
-            <span className="font-bold text-shamba-dark-green font-poppins">SmartSeason</span>
-          </div>
-
-          <h2 className="text-3xl font-bold text-gray-900 font-poppins mb-1">Welcome back</h2>
-          <p className="text-gray-500 text-sm mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 font-poppins mb-1">Welcome back</h2>
+          <p className="text-gray-500 text-sm mb-6 sm:mb-8">
             Don't have an account?{' '}
             <Link to="/register" className="text-shamba-green font-semibold hover:text-shamba-dark-green">
               Sign up
             </Link>
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email address</label>
               <input
@@ -126,7 +122,7 @@ const Login = () => {
             </button>
           </form>
 
-          <div className="mt-8 border-t border-gray-200 pt-6">
+          <div className="mt-6 sm:mt-8 border-t border-gray-200 pt-5">
             <p className="text-xs text-gray-400 text-center mb-3 uppercase tracking-wide font-semibold">Demo credentials</p>
             <div className="grid grid-cols-2 gap-3">
               {[
