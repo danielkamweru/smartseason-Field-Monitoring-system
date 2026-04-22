@@ -4,9 +4,10 @@
   "description": "Backend API for SmartSeason Field Monitoring System",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
+    "start": "node init-database.js && node index.js",
     "dev": "nodemon index.js",
-    "test": "jest"
+    "test": "jest",
+    "init-db": "node init-database.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
